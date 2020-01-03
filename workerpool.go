@@ -16,7 +16,7 @@ func NewWorkerPool(workerlen int) *WorkerPool {
 		WorkerQueue: make(chan chan Job, workerlen),
 	}
 }
-func (wp *WorkerPool) Run() (workers []Worker) {
+func (wp *WorkerPool) Run() (workers []*Worker) {
 	fmt.Println("初始化worker")
 	//初始化worker
 	for i := 0; i < wp.workerlen; i++ {
@@ -29,8 +29,10 @@ func (wp *WorkerPool) Run() (workers []Worker) {
 		for {
 			select {
 			case job := <-wp.JobQueue:
-				worker := <-wp.WorkerQueue
-				worker <- job
+				//从pool里面找到一个chan Job（属于某个worker）
+				jobCh := <-wp.WorkerQueue
+				//把当前得job分配给这个chan Job（属于某个worker）
+				jobCh <- job
 			}
 		}
 	}()

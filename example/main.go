@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
 	"time"
 )
 
@@ -14,7 +15,7 @@ type Score struct {
 	Num int
 }
 
-var Workers []concurrence.Worker
+var Workers []*concurrence.Worker
 
 //定义对数据的处理
 func (s *Score) Do() {
@@ -23,8 +24,9 @@ func (s *Score) Do() {
 }
 
 func main() {
-	c := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt)
+	sigCh := make(chan os.Signal)
+	//signal.Notify(sigCh, os.Interrupt)
+	signal.Notify(sigCh, os.Interrupt, os.Kill)
 
 	printInfo()
 	//// 定义一个cron运行器
@@ -36,6 +38,7 @@ func main() {
 	//cr.Start()
 	//defer cr.Stop()
 
+	time.Sleep(10 * time.Second)
 	num := 100 * 100 * 20
 	// debug.SetMaxThreads(num + 1000) //设置最大线程数
 	// 注册工作池，传入任务
@@ -44,7 +47,7 @@ func main() {
 	Workers = p.Run()
 
 	//写入datanum条数据
-	dataNum := 100 * 100 * 100
+	dataNum := 100 * 100 * 100 * 100
 	go func() {
 		for i := 1; i <= dataNum; i++ {
 			sc := &Score{Num: i}
@@ -52,13 +55,16 @@ func main() {
 		}
 	}()
 
+	var wg sync.WaitGroup
 	select {
-	case sig := <-c:
-		fmt.Printf("Got %s signal. Aborting...\n", sig)
+	case sig := <-sigCh:
+		fmt.Printf("Got %s signal. Aborting...,len(Workers):%d\n", sig, len(Workers))
+		wg.Add(len(Workers))
 		for _, worker := range Workers {
-			worker.Stop()
+			worker.Stop(&wg)
 		}
 	}
+	wg.Wait()
 }
 
 func printInfo() {
